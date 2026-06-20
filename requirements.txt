@@ -22,3 +22,8 @@ aiosqlite>=0.19.0
 
 # Encryption
 cryptography>=41.0.0
+
+# Language & Voice
+SpeechRecognition>=3.10.0
+pyttsx3>=2.90
+langdetect>=1.0.9
