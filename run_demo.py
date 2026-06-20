@@ -1,99 +1,73 @@
 #!/usr/bin/env python3
 """
-run_demo.py — Демонстрация работы One Planet Mentor
-Запускает orchestrator с 3 разными пользователями.
+run_demo.py — Демонстрация работы One Planet Mentor с анкетой
 """
 
 import asyncio
-import os
 from dotenv import load_dotenv
 
-# Загружаем .env
 load_dotenv()
 
 from src.models import UserProfile, Query
 from src.orchestrator import Orchestrator
+from src.onboarding import OnboardingAnswers, create_user_profile
 
 
 async def main():
-    print("\n🌍 One Planet Mentor — Multi-Agent Demo")
-    print("=" * 50)
+    print("\n🌍 One Planet Mentor — Demo с анкетой")
+    print("=" * 60)
+    
+    # ============================================
+    # Шаг 1: Пользователь заполняет анкету
+    # ============================================
+    print("\n📋 ШАГ 1: Заполнение анкеты\n")
+    
+    answers = OnboardingAnswers(
+        age=25,
+        religion="secular",
+        language="ru",
+        country="RU",
+        goals=["Изучить ML", "Развить карьеру"],
+        interests=["Наука и технологии", "Бизнес"],
+        communication_style="friendly",
+        experience_level="beginner"
+    )
+    
+    print(f"  ✅ Возраст: {answers.age}")
+    print(f"  ✅ Мировоззрение: {answers.religion}")
+    print(f"  ✅ Язык: {answers.language}")
+    print(f"  ✅ Цели: {answers.goals}")
+    
+    # Создаём профиль из анкеты
+    profile = create_user_profile(answers, user_id="demo_user_001")
+    
+    print(f"\n🎯 Профиль создан для пользователя {profile.user_id}")
+    
+    # ============================================
+    # Шаг 2: Задаём вопросы
+    # ============================================
+    print("\n" + "="*60)
+    print("💬 ШАГ 2: Общение с наставником\n")
     
     orchestrator = Orchestrator()
     
-    # ============================================
-    # Пример 1: 12-летняя девочка из Бразилии (католичка)
-    # ============================================
-    user1 = UserProfile(
-        user_id="maria_12_br",
-        age=12,
-        religion="christian",
-        language="pt",
-        country="BR",
-        goals=["учиться науке", "готовиться к школе"]
-    )
+    queries = [
+        "Как работают нейронные сети?",
+        "С чего начать изучение машинного обучения?",
+        "Какие навыки нужны для карьеры в IT?"
+    ]
     
-    query1 = Query(
-        text="Почему небо голубое?",
-        user=user1
-    )
+    for i, query_text in enumerate(queries, 1):
+        print(f"\n📝 Вопрос {i}: \"{query_text}\"")
+        
+        query = Query(text=query_text, user=profile)
+        response = await orchestrator.process(query)
+        
+        print(f"   🤖 Ответ:")
+        print(f"   {response.text[:200]}...")
+        print(f"   ⏱️  {response.latency_ms}ms")
     
-    print("\n📝 Query 1: \"Почему небо голубое?\"")
-    print("   👤 User: 12 лет, Бразилия, Christian")
-    response1 = await orchestrator.process(query1)
-    print("   🤖 Response:")
-    print("   " + response1.text.replace("\n", "\n   "))
-    print(f"   ⏱️  Latency: {response1.latency_ms}ms")
-    
-    # ============================================
-    # Пример 2: 70-летний дедушка из Саудовской Аравии (мусульманин)
-    # ============================================
-    user2 = UserProfile(
-        user_id="ahmed_70_sa",
-        age=70,
-        religion="muslim",
-        language="ar",
-        country="SA",
-        goals=["объяснить внукам науку", "оставаться активным"]
-    )
-    
-    query2 = Query(
-        text="Что такое гравитация? Хочу объяснить внукам.",
-        user=user2
-    )
-    
-    print("\n\n📝 Query 2: \"Что такое гравитация?\"")
-    print("   👤 User: 70 лет, Saudi Arabia, Muslim")
-    response2 = await orchestrator.process(query2)
-    print("   🤖 Response:")
-    print("   " + response2.text.replace("\n", "\n   "))
-    print(f"   ⏱️  Latency: {response2.latency_ms}ms")
-    
-    # ============================================
-    # Пример 3: 25-летний программист из Швеции (светский гуманист)
-    # ============================================
-    user3 = UserProfile(
-        user_id="erik_25_se",
-        age=25,
-        religion="secular",
-        language="sv",
-        country="SE",
-        goals=["изучить ML", "карьера в IT"]
-    )
-    
-    query3 = Query(
-        text="Как работают нейронные сети?",
-        user=user3
-    )
-    
-    print("\n\n📝 Query 3: \"Как работают нейронные сети?\"")
-    print("   👤 User: 25 лет, Sweden, Secular")
-    response3 = await orchestrator.process(query3)
-    print("   🤖 Response:")
-    print("   " + response3.text.replace("\n", "\n   "))
-    print(f"   ⏱️  Latency: {response3.latency_ms}ms")
-    
-    print("\n\n✨ Demo complete! 3 персонализированных ответа.")
+    print("\n\n✨ Demo complete!")
     print("🌍 One Planet — One Mentor — 8 Billion People")
 
 

@@ -15,3 +15,10 @@ rich>=13.7.0
 
 # API retries
 tenacity>=8.2.0
+
+# Database
+sqlalchemy>=2.0.0
+aiosqlite>=0.19.0
+
+# Encryption
+cryptography>=41.0.0
