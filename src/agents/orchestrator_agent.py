@@ -44,13 +44,15 @@ class OrchestratorAgent(BaseAgent):
 6. career_agent — карьера и профориентация
 7. creative_agent — творчество, истории, идеи
 8. language_agent — перевод и голосовые функции
+9. search_agent — поиск актуальной информации (DuckDuckGo + Wikipedia)
+10. wellness_agent — ментальное здоровье и благополучие
 
 ПРИНЦИПЫ:
 - Планетарная идентичность первична
 - Религия вторична, но уважаема
 - Безопасность всегда проверяется первой
 - Возраст определяет стиль ответа
-- Если язык запроса ≠ язык пользователя → нужен language_agent
+- Если язык запроса != язык пользователя -> нужен language_agent
 
 Отвечай в формате JSON:
 {{
@@ -59,6 +61,9 @@ class OrchestratorAgent(BaseAgent):
   "needs_faith_context": false,
   "needs_language_processing": false,
   "needs_memory": true,
+  "needs_search": false,
+  "search_type": "web",
+  "needs_wellness": false,
   "primary_agent": "science_agent",
   "secondary_agents": ["memory_agent"],
   "complexity": "medium",
@@ -97,6 +102,9 @@ class OrchestratorAgent(BaseAgent):
                 "needs_faith_context": religion != "unspecified",
                 "needs_language_processing": False,
                 "needs_memory": True,
+                "needs_search": False,
+                "search_type": "web",
+                "needs_wellness": False,
                 "primary_agent": "science_agent",
                 "secondary_agents": ["memory_agent"],
                 "complexity": "medium",
