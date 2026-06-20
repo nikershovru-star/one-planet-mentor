@@ -35,24 +35,28 @@ class OrchestratorAgent(BaseAgent):
             ("system", """Ты — AI-оркестратор One Planet Mentor.
 Твоя задача: проанализировать запрос пользователя и определить план выполнения.
 
-ДОСТУПНЫЕ АГЕНТЫ:
-1. age_agent — адаптация под возраст (5-99 лет)
-2. faith_agent — религиозный контекст (7 традиций)
-3. science_agent — научные ответы
-4. safety_agent — проверка безопасности
-5. memory_agent — история диалогов и память
-6. career_agent — карьера и профориентация
-7. creative_agent — творчество, истории, идеи
-8. language_agent — перевод и голосовые функции
-9. search_agent — поиск актуальной информации (DuckDuckGo + Wikipedia)
-10. wellness_agent — ментальное здоровье и благополучие
+ДОСТУПНЫЕ ЭКСПЕРТЫ (primary_agent):
+- science_agent — научные вопросы, факты, объяснения
+- career_agent — карьера, профориентация, навыки, работа
+- creative_agent — творчество, истории, стихи, идеи, игры
+- wellness_agent — ментальное здоровье, тревога, стресс, медитации
+- faith_agent — религиозные вопросы, духовность
+- search_agent — актуальные новости, свежие факты, Wikipedia
 
-ПРИНЦИПЫ:
-- Планетарная идентичность первична
-- Религия вторична, но уважаема
-- Безопасность всегда проверяется первой
-- Возраст определяет стиль ответа
-- Если язык запроса != язык пользователя -> нужен language_agent
+ДОСТУПНЫЕ КОНТЕКСТНЫЕ АГЕНТЫ:
+- age_agent — адаптация под возраст (5-99 лет)
+- faith_agent — религиозный контекст
+- memory_agent — история диалогов
+- search_agent — поиск информации
+- wellness_agent — анализ настроения
+
+ПРАВИЛА ВЫБОРА primary_agent:
+- "Как работает...", "Что такое...", "Объясни..." → science_agent
+- "Как войти в IT", "карьера", "навыки", "работа" → career_agent
+- "Напиши историю", "стих", "придумай", "творч" → creative_agent
+- "тревога", "стресс", "грусть", "депрессия", "медитация" → wellness_agent
+- "Бог", "религия", "вера", "молитва" → faith_agent
+- "новости", "последние", "сейчас", "2024", "2025" → search_agent
 
 Отвечай в формате JSON:
 {{
@@ -65,7 +69,7 @@ class OrchestratorAgent(BaseAgent):
   "search_type": "web",
   "needs_wellness": false,
   "primary_agent": "science_agent",
-  "secondary_agents": ["memory_agent"],
+  "secondary_agents": [],
   "complexity": "medium",
   "estimated_tokens": 500
 }}
@@ -85,7 +89,6 @@ class OrchestratorAgent(BaseAgent):
             "query": query
         })
         
-        # Парсим JSON из ответа
         try:
             text = response.content.strip()
             if text.startswith("```"):
@@ -95,7 +98,6 @@ class OrchestratorAgent(BaseAgent):
             
             plan = json.loads(text)
         except json.JSONDecodeError:
-            # Fallback если JSON не распарсился
             plan = {
                 "needs_safety_check": True,
                 "needs_age_adaptation": True,
@@ -106,7 +108,7 @@ class OrchestratorAgent(BaseAgent):
                 "search_type": "web",
                 "needs_wellness": False,
                 "primary_agent": "science_agent",
-                "secondary_agents": ["memory_agent"],
+                "secondary_agents": [],
                 "complexity": "medium",
                 "estimated_tokens": 500
             }

@@ -1,6 +1,7 @@
 """
 career_agent.py — Агент карьеры и профориентации
 Помогает с выбором профессии, развитием навыков, карьерным ростом
+Учитывает язык пользователя
 """
 
 import os
@@ -48,7 +49,7 @@ class CareerAgent(BaseAgent):
   "planetary_connection": "как это служит миру"
 }}
 
-Отвечай ТОЛЬКО JSON на РУССКОМ."""),
+Отвечай ТОЛЬКО JSON."""),
             ("user", """Возраст: {age}
 Цели пользователя: {goals}
 Запрос: {query}""")
@@ -83,8 +84,23 @@ class CareerAgent(BaseAgent):
             metadata=career_data
         )
     
-    async def answer(self, query: str, age: int, goals: list = None) -> str:
-        """Даёт развёрнутый карьерный совет."""
+    async def answer(self, query: str, age: int, goals: list = None, language: str = "ru") -> str:
+        """Даёт развёрнутый карьерный совет на языке пользователя."""
+        
+        lang_names = {
+            "ru": "русском",
+            "en": "английском",
+            "es": "испанском",
+            "fr": "французском",
+            "de": "немецком",
+            "zh": "китайском",
+            "ar": "арабском",
+            "hi": "хинди",
+            "pt": "португальском",
+            "ja": "японском"
+        }
+        
+        target_lang = lang_names.get(language, "русском")
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Ты — опытный карьерный консультант One Planet Mentor.
@@ -92,7 +108,9 @@ class CareerAgent(BaseAgent):
 ВОЗРАСТ ПОЛЬЗОВАТЕЛЯ: {age}
 ЦЕЛИ: {goals}
 
- ПРАВИЛА:
+ВАЖНО: Отвечай СТРОГО на {target_lang} языке!
+
+ПРАВИЛА:
 - Давай конкретные, выполнимые советы
 - Учитывай этап жизни
 - Подчёркивай важность обучения
@@ -106,6 +124,7 @@ class CareerAgent(BaseAgent):
         response = await chain.ainvoke({
             "age": age,
             "goals": ", ".join(goals) if goals else "не указаны",
+            "target_lang": target_lang,
             "query": query
         })
         

@@ -1,6 +1,6 @@
 """
 orchestrator.py — Оптимизированный AI-оркестратор
-Параллельные вызовы агентов + кэширование + интеграция всех 11 агентов
+Параллельные вызовы агентов + кэширование + правильный роутинг к экспертам
 """
 
 import asyncio
@@ -26,7 +26,7 @@ from .config import get_config, get_cached_translation, cache_translation
 class Orchestrator:
     """
     Оптимизированный AI-оркестратор One Planet Mentor.
-    Все 11 агентов работают параллельно когда возможно.
+    Правильный роутинг: каждый запрос идёт к нужному эксперту.
     """
     
     PLANETARY_VALUES = [
@@ -84,14 +84,13 @@ class Orchestrator:
         needs_back_translation = False
         
         if self.config["use_language_agent"]:
-            print(f"    Language Agent...")
+            print(f"   🌐 Language Agent...")
             lang_context = await self.language_agent.get_context(query.text, query.user.language)
             detected_lang = lang_context.metadata.get("detected_language", query.user.language)
             needs_translation = lang_context.metadata.get("needs_translation", False)
             agents_used.append("language")
             
             if needs_translation and detected_lang != query.user.language:
-                # Проверяем кэш переводов
                 cached = get_cached_translation(query.text, detected_lang, query.user.language)
                 if cached:
                     print(f"   ⚡ Перевод из кэша!")
@@ -104,16 +103,15 @@ class Orchestrator:
                     cache_translation(query.text, detected_lang, query.user.language, working_query)
                 needs_back_translation = True
         
-        # Шаг 3: Hermes3 анализирует запрос (если включён)
+        # Шаг 3: Hermes3 анализирует запрос
         plan = {}
         if self.config["use_orchestrator"]:
-            print(f"    Hermes3 анализирует...")
+            print(f"   🧠 Hermes3 анализирует...")
             plan = await self.orchestrator_agent.decide_routing(
                 working_query, query.user.age, query.user.religion, query.user.language
             )
             agents_used.append("orchestrator")
         else:
-            # Быстрый режим — стандартный план
             plan = {
                 "needs_safety_check": True,
                 "needs_age_adaptation": True,
@@ -143,33 +141,27 @@ class Orchestrator:
         tasks = []
         task_names = []
         
-        # Age Agent
         if plan.get("needs_age_adaptation", True):
             tasks.append(self.age_agent.get_context(query.user.age, working_query))
             task_names.append("age")
         
-        # Faith Agent
         if plan.get("needs_faith_context", False):
             tasks.append(self.faith_agent.get_context(query.user.religion, working_query))
             task_names.append("faith")
         
-        # Memory Agent
         if self.config["use_memory_agent"] and plan.get("needs_memory", True):
             tasks.append(self.memory_agent.get_context(query.user.user_id, working_query))
             task_names.append("memory")
         
-        # Search Agent
         if self.config["use_search_agent"] and plan.get("needs_search", False):
             search_type = plan.get("search_type", "web")
             tasks.append(self.search_agent.get_context(working_query, search_type))
             task_names.append("search")
         
-        # Wellness Agent
         if self.config["use_wellness_agent"] and plan.get("needs_wellness", False):
             tasks.append(self.wellness_agent.get_context(query.user.age, working_query))
             task_names.append("wellness")
         
-        # Запускаем все параллельно
         if tasks:
             results = await asyncio.gather(*tasks, return_exceptions=True)
             
@@ -183,18 +175,24 @@ class Orchestrator:
         else:
             contexts = {}
         
-        # Шаг 6: Экспертный ответ
+        # Шаг 6: ПРАВИЛЬНЫЙ РОУТИНГ — вызываем нужного эксперта
         primary_agent = plan.get("primary_agent", "science_agent")
-        print(f"   🔬 {primary_agent} генерирует ответ...")
+        print(f"    Эксперт: {primary_agent}")
         
-        expert_response = await self.science_agent.answer(
+        expert_response = await self._get_expert_response(
+            primary_agent=primary_agent,
             query=working_query,
+            age=query.user.age,
             age_context=contexts.get("age", AgentContext(agent_name="age_agent", guidelines="", metadata={})),
-            faith_context=contexts.get("faith", AgentContext(agent_name="faith_agent", guidelines="", metadata={}))
+            faith_context=contexts.get("faith", AgentContext(agent_name="faith_agent", guidelines="", metadata={})),
+            wellness_context=contexts.get("wellness", AgentContext(agent_name="wellness_agent", guidelines="", metadata={})),
+            search_context=contexts.get("search", AgentContext(agent_name="search_agent", guidelines="", metadata={})),
+            memory_context=contexts.get("memory", AgentContext(agent_name="memory_agent", guidelines="", metadata={})),
+            goals=query.user.goals
         )
-        agents_used.append("science")
+        agents_used.append(primary_agent.replace("_agent", ""))
         
-        # Шаг 7: Перевод обратно (если был перевод)
+        # Шаг 7: Перевод обратно
         final_text = expert_response
         if needs_back_translation:
             cached_back = get_cached_translation(expert_response, query.user.language, detected_lang)
@@ -202,7 +200,7 @@ class Orchestrator:
                 print(f"   ⚡ Обратный перевод из кэша!")
                 final_text = cached_back
             else:
-                print(f"    Обратный перевод...")
+                print(f"   🔄 Обратный перевод...")
                 final_text = await self.language_agent.translate(
                     expert_response, query.user.language, detected_lang
                 )
@@ -232,6 +230,56 @@ class Orchestrator:
             latency_ms=latency_ms
         )
     
+    async def _get_expert_response(self, primary_agent, query, age, age_context, faith_context, wellness_context, search_context, memory_context, goals):
+        """Вызывает правильного эксперта на основе решения Hermes3."""
+        
+        if primary_agent == "career_agent":
+            print(f"   💼 Career Agent генерирует ответ...")
+            return await self.career_agent.answer(query, age, goals, query.user.language if hasattr(query, 'user') else 'ru')
+        
+        elif primary_agent == "creative_agent":
+            print(f"   🎨 Creative Agent генерирует ответ...")
+            creative_type = "story"
+            if "стих" in query.lower() or "poem" in query.lower():
+                creative_type = "poem"
+            elif "иде" in query.lower() or "idea" in query.lower():
+                creative_type = "idea"
+            return await self.creative_agent.create(query, age, creative_type, query.user.language if hasattr(query, 'user') else 'ru')
+        
+        elif primary_agent == "wellness_agent":
+            print(f"   💚 Wellness Agent генерирует ответ...")
+            mood = "neutral"
+            if "тревог" in query.lower() or "anxious" in query.lower():
+                mood = "anxious"
+            elif "груст" in query.lower() or "sad" in query.lower():
+                mood = "sad"
+            elif "стресс" in query.lower() or "stress" in query.lower():
+                mood = "stressed"
+            return await self.wellness_agent.provide_support(query, age, mood, query.user.language if hasattr(query, 'user') else 'ru')
+        
+        elif primary_agent == "faith_agent":
+            print(f"   🕊️ Faith Agent генерирует ответ...")
+            return await self.faith_agent.answer(query, age_context, faith_context)
+        
+        elif primary_agent == "search_agent":
+            print(f"   🔍 Search Agent генерирует ответ...")
+            search_type = "web"
+            if "вики" in query.lower() or "wiki" in query.lower():
+                search_type = "wiki"
+            elif "новост" in query.lower() or "news" in query.lower():
+                search_type = "news"
+            summary = await self.search_agent.search_and_summarize(query, search_type)
+            return f"📚 Результаты поиска:\n\n{summary}"
+        
+        else:
+            # По умолчанию — science_agent
+            print(f"   🔬 Science Agent генерирует ответ...")
+            return await self.science_agent.answer(
+                query=query,
+                age_context=age_context,
+                faith_context=faith_context
+            )
+    
     def _synthesize(self, expert: str, contexts: dict) -> str:
         """Собирает финальный ответ с учётом всех контекстов."""
         return expert
@@ -249,10 +297,10 @@ class Orchestrator:
             "muslim": "\n\n🌍 Это объединяет нас всех на одной Земле.",
             "jewish": "\n\n✨ Тикун олам — исправление мира для всех.",
             "buddhist": "\n\n☸️ Мы все взаимосвязаны на этой планете.",
-            "hindu": "\n\n🕉️ Васудхайва кутумбакам — весь мир одна семья.",
-            "secular": "\n\n Общая ценность всего человечества.",
+            "hindu": "\n\n️ Васудхайва кутумбакам — весь мир одна семья.",
+            "secular": "\n\n🌱 Общая ценность всего человечества.",
         }
-        return text + bridges.get(religion, "\n\n Мы все — одна семья на планете.")
+        return text + bridges.get(religion, "\n\n🌍 Мы все — одна семья на планете.")
     
     def get_cache_stats(self) -> dict:
         """Возвращает статистику кэша."""

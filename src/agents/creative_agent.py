@@ -1,6 +1,7 @@
 """
 creative_agent.py — Творческий агент
 Генерирует идеи, истории, стихи, творческие задания
+Учитывает язык пользователя
 """
 
 import os
@@ -22,7 +23,7 @@ class CreativeAgent(BaseAgent):
         self.llm = ChatOllama(
             model=model,
             base_url=base_url,
-            temperature=0.8  # Высокая температура для креативности!
+            temperature=0.8
         )
     
     async def get_context(self, age: int, query: str) -> AgentContext:
@@ -70,8 +71,8 @@ class CreativeAgent(BaseAgent):
             metadata=creative_data
         )
     
-    async def create(self, query: str, age: int, creative_type: str = "story") -> str:
-        """Генерирует творческий контент."""
+    async def create(self, query: str, age: int, creative_type: str = "story", language: str = "ru") -> str:
+        """Генерирует творческий контент на языке пользователя."""
         
         type_prompts = {
             "story": "Напиши интересную историю",
@@ -85,11 +86,29 @@ class CreativeAgent(BaseAgent):
         
         instruction = type_prompts.get(creative_type, "Ответь творчески")
         
+        # Маппинг языков
+        lang_names = {
+            "ru": "русском",
+            "en": "английском",
+            "es": "испанском",
+            "fr": "французском",
+            "de": "немецком",
+            "zh": "китайском",
+            "ar": "арабском",
+            "hi": "хинди",
+            "pt": "португальском",
+            "ja": "японском"
+        }
+        
+        target_lang = lang_names.get(language, "русском")
+        
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Ты — творческий наставник One Planet Mentor.
 {instruction} для пользователя возраста {age}.
 
-🎨 ПРАВИЛА:
+ВАЖНО: Отвечай СТРОГО на {target_lang} языке!
+
+ПРАВИЛА:
 - Будь оригинальным и вдохновляющим
 - Адаптируй сложность под возраст
 - Используй яркие образы и метафоры
@@ -102,6 +121,7 @@ class CreativeAgent(BaseAgent):
         response = await chain.ainvoke({
             "instruction": instruction,
             "age": age,
+            "target_lang": target_lang,
             "query": query
         })
         

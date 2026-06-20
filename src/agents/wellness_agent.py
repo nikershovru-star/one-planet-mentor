@@ -1,6 +1,7 @@
 """
 wellness_agent.py — Агент ментального здоровья и благополучия
 Поддержка, медитации, работа с тревогой и стрессом
+Учитывает язык пользователя
 """
 
 import os
@@ -22,7 +23,7 @@ class WellnessAgent(BaseAgent):
         self.llm = ChatOllama(
             model=model,
             base_url=base_url,
-            temperature=0.5  # Немного выше для эмпатии
+            temperature=0.5
         )
     
     async def get_context(self, age: int, query: str, mood: str = "neutral") -> AgentContext:
@@ -83,8 +84,23 @@ class WellnessAgent(BaseAgent):
             metadata=wellness_data
         )
     
-    async def provide_support(self, query: str, age: int, mood: str = "neutral") -> str:
-        """Даёт развёрнутую поддержку и рекомендации."""
+    async def provide_support(self, query: str, age: int, mood: str = "neutral", language: str = "ru") -> str:
+        """Даёт развёрнутую поддержку и рекомендации на языке пользователя."""
+        
+        lang_names = {
+            "ru": "русском",
+            "en": "английском",
+            "es": "испанском",
+            "fr": "французском",
+            "de": "немецком",
+            "zh": "китайском",
+            "ar": "арабском",
+            "hi": "хинди",
+            "pt": "португальском",
+            "ja": "японском"
+        }
+        
+        target_lang = lang_names.get(language, "русском")
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Ты — поддерживающий наставник One Planet Mentor.
@@ -93,8 +109,9 @@ class WellnessAgent(BaseAgent):
 ВОЗРАСТ: {age}
 НАСТРОЕНИЕ: {mood}
 
+ВАЖНО: Отвечай СТРОГО на {target_lang} языке! Будь тёплым и эмпатичным.
+
 ПРАВИЛА:
-- Будь тёплым и эмпатичным
 - Используй техники: дыхание, медитация, заземление
 - Давай конкретные упражнения
 - Напоминай о важности заботы о себе
@@ -108,21 +125,39 @@ class WellnessAgent(BaseAgent):
         response = await chain.ainvoke({
             "age": age,
             "mood": mood,
+            "target_lang": target_lang,
             "query": query
         })
         
         return response.content
     
-    async def guided_meditation(self, duration: int = 5, focus: str = "calm") -> str:
-        """Проводит медитацию."""
+    async def guided_meditation(self, duration: int = 5, focus: str = "calm", language: str = "ru") -> str:
+        """Проводит медитацию на языке пользователя."""
+        
+        lang_names = {
+            "ru": "русском",
+            "en": "английском",
+            "es": "испанском",
+            "fr": "французском",
+            "de": "немецком",
+            "zh": "китайском",
+            "ar": "арабском",
+            "hi": "хинди",
+            "pt": "португальском",
+            "ja": "японском"
+        }
+        
+        target_lang = lang_names.get(language, "русском")
         
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Ты — мастер медитации One Planet Mentor.
 Проведи медитацию длительностью {duration} минут с фокусом на {focus}.
 
+ВАЖНО: Проводи медитацию СТРОГО на {target_lang} языке!
+
 СТРУКТУРА:
 1. Подготовка (1 минута)
-2. Основная практика ({duration-2} минут)
+2. Основная практика ({duration_minus_2} минут)
 3. Завершение (1 минута)
 
 Используй:
@@ -135,7 +170,9 @@ class WellnessAgent(BaseAgent):
         chain = prompt | self.llm
         response = await chain.ainvoke({
             "duration": duration,
-            "focus": focus
+            "focus": focus,
+            "duration_minus_2": max(1, duration - 2),
+            "target_lang": target_lang
         })
         
         return response.content
