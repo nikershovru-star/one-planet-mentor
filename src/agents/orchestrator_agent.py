@@ -28,10 +28,9 @@ class OrchestratorAgent(BaseAgent):
             temperature=0.2
         )
     
-    async def get_context(self, query: str, age: int, religion: str) -> AgentContext:
+    async def get_context(self, query: str, age: int, religion: str, user_language: str = "ru") -> AgentContext:
         """Анализирует запрос и возвращает план выполнения."""
         
-        # ВАЖНО: фигурные скобки в JSON экранированы двойными {{}}
         prompt = ChatPromptTemplate.from_messages([
             ("system", """Ты — AI-оркестратор One Planet Mentor.
 Твоя задача: проанализировать запрос пользователя и определить план выполнения.
@@ -41,19 +40,27 @@ class OrchestratorAgent(BaseAgent):
 2. faith_agent — религиозный контекст (7 традиций)
 3. science_agent — научные ответы
 4. safety_agent — проверка безопасности
+5. memory_agent — история диалогов и память
+6. career_agent — карьера и профориентация
+7. creative_agent — творчество, истории, идеи
+8. language_agent — перевод и голосовые функции
 
 ПРИНЦИПЫ:
 - Планетарная идентичность первична
 - Религия вторична, но уважаема
 - Безопасность всегда проверяется первой
 - Возраст определяет стиль ответа
+- Если язык запроса ≠ язык пользователя → нужен language_agent
 
 Отвечай в формате JSON:
 {{
   "needs_safety_check": true,
   "needs_age_adaptation": true,
   "needs_faith_context": false,
+  "needs_language_processing": false,
+  "needs_memory": true,
   "primary_agent": "science_agent",
+  "secondary_agents": ["memory_agent"],
   "complexity": "medium",
   "estimated_tokens": 500
 }}
@@ -61,6 +68,7 @@ class OrchestratorAgent(BaseAgent):
 Отвечай ТОЛЬКО JSON, без пояснений."""),
             ("user", """Возраст пользователя: {age}
 Религиозный контекст: {religion}
+Язык пользователя: {user_language}
 Запрос: {query}""")
         ])
         
@@ -68,26 +76,29 @@ class OrchestratorAgent(BaseAgent):
         response = await chain.ainvoke({
             "age": age,
             "religion": religion,
+            "user_language": user_language,
             "query": query
         })
         
         # Парсим JSON из ответа
         try:
             text = response.content.strip()
-            # Убираем markdown обёртку если есть
-            if "```json" in text:
-                text = text.split("```json")[1].split("```")[0]
-            elif "```" in text:
-                text = text.split("```")[1].split("```")[0]
+            if text.startswith("```"):
+                text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            if text.endswith("```"):
+                text = text[:-3]
             
             plan = json.loads(text)
-        except (json.JSONDecodeError, IndexError):
+        except json.JSONDecodeError:
             # Fallback если JSON не распарсился
             plan = {
                 "needs_safety_check": True,
                 "needs_age_adaptation": True,
                 "needs_faith_context": religion != "unspecified",
+                "needs_language_processing": False,
+                "needs_memory": True,
                 "primary_agent": "science_agent",
+                "secondary_agents": ["memory_agent"],
                 "complexity": "medium",
                 "estimated_tokens": 500
             }
@@ -98,7 +109,7 @@ class OrchestratorAgent(BaseAgent):
             metadata=plan
         )
     
-    async def decide_routing(self, query: str, age: int, religion: str) -> dict:
+    async def decide_routing(self, query: str, age: int, religion: str, user_language: str = "ru") -> dict:
         """Упрощённый метод для быстрого роутинга."""
-        context = await self.get_context(query, age, religion)
+        context = await self.get_context(query, age, religion, user_language)
         return context.metadata
